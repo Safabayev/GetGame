@@ -11,7 +11,9 @@ import cats.effect.Resource
 import cats.effect.Sync
 import cats.effect.std.Console
 import cats.effect.std.Dispatcher
+import cats.implicits.catsSyntaxApplicativeError
 import cats.implicits.catsSyntaxApplicativeId
+import cats.implicits.catsSyntaxOptionId
 import cats.implicits.toFlatMapOps
 import cats.implicits.toFunctorOps
 import cats.implicits.toTraverseOps
@@ -48,28 +50,26 @@ object Environment {
 
   @unused
   private def makeTransactor[F[_]: Async](dbConfig: Config.DataBaseConfig): Transactor[F] =
-    Transactor
-      .after
-      .set(
-        Transactor.fromDriverManager[F](
-          "org.postgresql.Driver",
-          s"jdbc:postgresql://${dbConfig.host}:${dbConfig.port}/${dbConfig.database}",
-          s"${dbConfig.user}",
-          s"${dbConfig.password}",
-        ),
-        HC.rollback,
-      )
+    Transactor.fromDriverManager[F](
+      "org.postgresql.Driver",
+      s"jdbc:postgresql://${dbConfig.host}:${dbConfig.port}/${dbConfig.database}",
+      s"${dbConfig.user}",
+      s"${dbConfig.password}",
+    )
 
   def graphQL[F[_]: Async: Logger: Dispatcher](
       repositories: Repositories[F]
     ): GraphQL[F] =
     SangriaGraphQL[F](
-      Schema(query = new GamesApi[F].queryType),
+      Schema(
+        query = new GamesApi[F].queryType,
+        mutation = new GamesApi[F].mutationType.some,
+      ),
       DeferredResolver.empty,
       repositories.pure[F],
       global,
     )
-  private def getGamesFromApi[F[_]: Sync](repo: GamesRepository[F]): F[Unit] = {
+  private def getGamesFromApi[F[_]: Async: Logger](repo: GamesRepository[F]): F[Unit] = {
     val freeGameApiClient = new FreeGameApiClient()
     def gameRespToGame(gameResp: GameResp): F[Game] =
       for {

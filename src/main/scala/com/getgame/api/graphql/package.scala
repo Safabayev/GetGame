@@ -5,8 +5,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.UUID
 import sangria.ast
-import sangria.macros.derive.deriveObjectType
-import sangria.schema.{ ListType, ObjectType, ScalarType }
+import sangria.macros.derive.{deriveInputObjectType, deriveObjectType}
+import sangria.schema.{InputObjectType, ListType, ObjectType, ScalarType}
 import sangria.validation.ValueCoercionViolation
 import com.getgame.domain.Game
 import com.getgame.repos.Repositories
@@ -64,5 +64,6 @@ package object graphql {
   )
 
   implicit val GameType: ObjectType[Unit, Game] = deriveObjectType[Unit, Game]()
+  implicit val GameInputType: InputObjectType[Game] = deriveInputObjectType[Game]()
   implicit val GameListType: ListType[Game] = ListType(GameType)
 }
