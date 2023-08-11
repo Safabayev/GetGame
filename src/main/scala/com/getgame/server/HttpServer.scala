@@ -57,7 +57,7 @@ object HttpServer {
       logger: Logger[F]
     ): Resource[F, F[ExitCode]] =
     HttpServer.make[F](env.config.httpServer, _ => allRoutes[F](env)).map { _ =>
-      logger.info(s"SmartSchool http server is started").as(ExitCode.Success)
+      logger.info(s"Game Get Ez http server is started").as(ExitCode.Success)
     }
 
   def make[F[_]: Async: Logger](
