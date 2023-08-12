@@ -2,11 +2,10 @@ package com.getgame
 
 import scala.annotation.unused
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
 import scala.concurrent.duration.DurationInt
-
 import cats.effect.Async
 import cats.effect.Resource
+import cats.effect.implicits.genSpawnOps
 import cats.effect.std.Console
 import cats.effect.std.Dispatcher
 import cats.implicits.catsSyntaxApplicativeId
@@ -20,7 +19,6 @@ import org.typelevel.log4cats.Logger
 import pureconfig.generic.auto.exportReader
 import sangria.execution.deferred.DeferredResolver
 import sangria.schema.Schema
-
 import com.getgame.api.graphql.GraphQL
 import com.getgame.api.graphql.SangriaGraphQL
 import com.getgame.api.graphql.schema.GamesApi
@@ -74,7 +72,8 @@ object Environment {
       implicit0(context: DBContext) = new DoobieContext.Postgres(myNamingStrategy)
       implicit0(xa: Transactor[F]) = makeTransactor(config.database)
       repos = Repositories.make[F]
-      _ <- Resource.eval(getGamesScheduler[F](repos.games))
       graphql = graphQL[F](repos)
+      _ <- Resource.eval(getGamesScheduler[F](repos.games).start)
+      _ = Logger[F].info(s"RUNNING AS ASYNC")
     } yield Environment[F](config, graphql)
 }

@@ -2,16 +2,13 @@ package com.getgame.scheduler
 
 import java.time.ZonedDateTime
 import java.util.UUID
-
 import scala.concurrent.duration.Duration
-
 import cats.effect.Async
 import cats.effect.kernel.Sync
 import cats.implicits.toFlatMapOps
 import cats.implicits.toFunctorOps
 import cats.implicits.toTraverseOps
 import org.typelevel.log4cats.Logger
-
 import com.getgame.domain.Game
 import com.getgame.domain.freeToGameAPI.GameResp
 import com.getgame.integration.FreeGameApiClient
@@ -44,8 +41,9 @@ class GetGamesScheduler[F[_]: Async: Logger](interval: Duration) {
   def scheduleTask(repo: GamesRepository[F]): F[Unit] =
     for {
       _ <- Logger[F].info("Starting Get Game Scheduler")
-      _ <- Sync[F].sleep(interval)
       _ <- getGamesFromApi(repo)
+      _ <- Logger[F].info("Finishing Get Game Scheduler")
+      _ <- Sync[F].sleep(interval)
       _ <- scheduleTask(repo)
     } yield ()
 }
