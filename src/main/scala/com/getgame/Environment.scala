@@ -1,23 +1,16 @@
 package com.getgame
 
-import java.time.ZonedDateTime
-import java.util.UUID
-
 import scala.annotation.unused
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.DurationInt
 
 import cats.effect.Async
 import cats.effect.Resource
-import cats.effect.Sync
 import cats.effect.std.Console
 import cats.effect.std.Dispatcher
-import cats.implicits.catsSyntaxApplicativeError
 import cats.implicits.catsSyntaxApplicativeId
 import cats.implicits.catsSyntaxOptionId
-import cats.implicits.toFlatMapOps
-import cats.implicits.toFunctorOps
-import cats.implicits.toTraverseOps
-import doobie.HC
 import doobie.util.transactor.Transactor
 import io.getquill.CompositeNamingStrategy2
 import io.getquill.PluralizedTableNames
@@ -31,11 +24,9 @@ import sangria.schema.Schema
 import com.getgame.api.graphql.GraphQL
 import com.getgame.api.graphql.SangriaGraphQL
 import com.getgame.api.graphql.schema.GamesApi
-import com.getgame.domain.Game
-import com.getgame.domain.freeToGameAPI.GameResp
-import com.getgame.integration.FreeGameApiClient
 import com.getgame.repos.GamesRepository
 import com.getgame.repos.Repositories
+import com.getgame.scheduler.GetGamesScheduler
 import com.getgame.utils.Migrations
 
 case class Environment[F[_]](
@@ -69,26 +60,12 @@ object Environment {
       repositories.pure[F],
       global,
     )
-  private def getGamesFromApi[F[_]: Async: Logger](repo: GamesRepository[F]): F[Unit] = {
-    val freeGameApiClient = new FreeGameApiClient()
-    def gameRespToGame(gameResp: GameResp): F[Game] =
-      for {
-        id <- Sync[F].delay(UUID.randomUUID())
-        createdAt <- Sync[F].delay(ZonedDateTime.now())
-        game = Game(
-          id = id,
-          title = gameResp.title,
-          genre = gameResp.genre,
-          platform = gameResp.platform,
-          developer = gameResp.developer,
-          createdAt = createdAt,
-        )
-      } yield game
-    for {
-      games <- freeGameApiClient.getGames.traverse(gameRespToGame)
-      _ <- repo.createGames(games)
-    } yield ()
+
+  private def getGamesScheduler[F[_]: Async: Logger](repo: GamesRepository[F]): F[Unit] = {
+    val getGameScheduler = new GetGamesScheduler[F](1.hours)
+    getGameScheduler.scheduleTask(repo)
   }
+
   def make[F[_]: Async: Console: Logger]: Resource[F, Environment[F]] =
     for {
       config <- Resource.eval(ConfigLoader.load[F, Config])
@@ -97,7 +74,7 @@ object Environment {
       implicit0(context: DBContext) = new DoobieContext.Postgres(myNamingStrategy)
       implicit0(xa: Transactor[F]) = makeTransactor(config.database)
       repos = Repositories.make[F]
-      _ <- Resource.eval(getGamesFromApi[F](repos.games))
+      _ <- Resource.eval(getGamesScheduler[F](repos.games))
       graphql = graphQL[F](repos)
     } yield Environment[F](config, graphql)
 }

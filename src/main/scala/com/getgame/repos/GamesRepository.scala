@@ -13,7 +13,7 @@ import com.getgame.domain.Game
 trait GamesRepository[F[_]] {
   def createGames(games: List[Game]): F[Unit]
   def createGame(games: Game): F[Unit]
-  def fetchAll: F[List[Game]]
+  def fetchAll(genre: Option[String]): F[List[Game]]
 }
 object GamesRepository {
   def make[F[_]: MonadCancelThrow: Logger](
@@ -24,8 +24,10 @@ object GamesRepository {
     new GamesRepository[F] {
       import ctx._
 
-      override def fetchAll: F[List[Game]] =
-        run(query[Game]).transact(xa)
+      override def fetchAll(genre: Option[String]): F[List[Game]] =
+        run(
+          dynamicQuery[Game].filterOpt(genre)((game, genre) => quote(game.genre == genre))
+        ).transact(xa)
 
       override def createGames(games: List[Game]): F[Unit] =
         run(

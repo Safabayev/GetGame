@@ -18,9 +18,10 @@ class GamesApi[F[_]: Sync](implicit dispatcher: Dispatcher[F]) {
   class Queries {
     @GraphQLField
     def games(
-        ctx: Context[Ctx[F], Unit]
+        ctx: Context[Ctx[F], Unit],
+        genre: Option[String]
       ): Future[List[Game]] =
-      dispatcher.unsafeToFuture(ctx.ctx.games.fetchAll)
+      dispatcher.unsafeToFuture(ctx.ctx.games.fetchAll(genre))
   }
 
   class Mutations {
@@ -31,13 +32,13 @@ class GamesApi[F[_]: Sync](implicit dispatcher: Dispatcher[F]) {
         genre: String,
         platform: String,
         developer: String
-      ): Future[String] = {
+      ): Future[UUID] = {
       val createTask = for {
         id <- Sync[F].delay(UUID.randomUUID())
         now <- Sync[F].delay(ZonedDateTime.now)
         game = Game(id, title, genre, platform, developer, now)
         _ <- ctx.ctx.games.createGame(game)
-      } yield "Ok"
+      } yield id
       dispatcher.unsafeToFuture(createTask)
     }
   }
